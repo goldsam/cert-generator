@@ -31,6 +31,9 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
     digestAlgorithm=$(yq e ".certificates[$i].digestAlgorithm" "$CONFIG_FILE")
     validityDays=$(yq e ".certificates[$i].validityDays" "$CONFIG_FILE")
     
+    # Convert digest algorithm to lowercase and prefix with a dash.
+    digestOption="-$(echo "$digestAlgorithm" | tr '[:upper:]' '[:lower:]')"
+
     # Build the subject string in OpenSSL format.
     subjectStr="/C=${subjectC}/ST=${subjectST}/L=${subjectL}/O=${subjectO}"
     if [ "$subjectOU" != "null" ] && [ -n "$subjectOU" ]; then
@@ -68,17 +71,17 @@ EOF
 
     regenerate=0
 
-    # If the certificate file exists, compare its subject and SANs.
+    # If the certificate file exists, compare its subject, SANs, key size, and digest algorithm.
     if [ -f "$certFile" ]; then
         currentSubject=$(openssl x509 -in "$certFile" -noout -subject | sed 's/subject= //')
-        # A simple check: ensure the certificate's subject includes the expected common name.
+        # Check subject: ensure the certificate's subject includes the expected common name.
         if ! echo "$currentSubject" | grep -q "$subjectCN"; then
             echo "Subject mismatch for $certName."
             regenerate=1
         fi
 
+        # Check SAN entries if provided.
         if [ $SAN_PRESENT -eq 1 ]; then
-            # Extract the SAN extension from the certificate.
             currentSAN=$(openssl x509 -in "$certFile" -noout -ext subjectAltName | sed 's/subjectAltName=//')
             for j in $(seq 0 $(($sanCount - 1))); do
                 sanEntry=$(yq e ".certificates[$i].san[$j]" "$CONFIG_FILE")
@@ -89,6 +92,22 @@ EOF
                 fi
             done
         fi
+
+        # Check key size.
+        # Extract the key size from the certificate's text. This assumes a line like "Public-Key: (2048 bit)".
+        currentKeySize=$(openssl x509 -in "$certFile" -noout -text | grep "Public-Key" | head -n1 | awk -F'[(]' '{print $2}' | awk -F' ' '{print $1}')
+        if [ "$currentKeySize" != "$keySize" ]; then
+            echo "Key size mismatch for $certName. Expected ${keySize}, got ${currentKeySize}."
+            regenerate=1
+        fi
+
+        # Check digest algorithm.
+        # Extract the signature algorithm, e.g. "sha256WithRSAEncryption".
+        currentDigest=$(openssl x509 -in "$certFile" -noout -text | grep "Signature Algorithm" | head -n1 | awk -F': ' '{print $2}')
+        if ! echo "$currentDigest" | grep -qi "$digestAlgorithm"; then
+            echo "Digest algorithm mismatch for $certName. Expected ${digestAlgorithm}, got ${currentDigest}."
+            regenerate=1
+        fi
     else
         regenerate=1
     fi
@@ -97,16 +116,17 @@ EOF
     if [ $regenerate -eq 1 ]; then
         echo "Generating certificate for $certName..."
         if [ $SAN_PRESENT -eq 1 ]; then
-            openssl req -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
+            openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile" \
               -extensions v3_req -config "$extFile"
             rm "$extFile"
         else
-            openssl req -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
+            openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile"
         fi
     else
         echo "Certificate $certName is up-to-date."
     fi
+
 
 done

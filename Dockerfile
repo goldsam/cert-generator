@@ -5,4 +5,4 @@ COPY generate-certs.sh /usr/local/bin/generate-certs.sh
 RUN chmod +x /usr/local/bin/generate-certs.sh
 WORKDIR /certs
 ENTRYPOINT ["/usr/local/bin/generate-certs.sh"]
-CMD ["/certs/config.yml"]
+CMD ["/config.yml", "/certs"]

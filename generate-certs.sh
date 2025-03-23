@@ -2,12 +2,20 @@
 set -e
 
 # Check for config file argument
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <config-file.json|config-file.yaml>"
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 <config-file.json|config-file.yaml> [output-directory]"
     exit 1
 fi
 
 CONFIG_FILE="$1"
+OUTPUT_DIR="${2:-.}"  # Default to current directory if not specified
+
+# Create output directory if it doesn't exist
+if [ ! -d "$OUTPUT_DIR" ]; then
+    echo "Creating output directory: $OUTPUT_DIR"
+    mkdir -p "$OUTPUT_DIR"
+fi
+
 
 # Get the number of certificates in the config.
 CERT_COUNT=$(yq e '.certificates | length' "$CONFIG_FILE")
@@ -66,8 +74,8 @@ EOF
     fi
 
     # Define file names for the certificate and key.
-    certFile="${certName}.crt"
-    keyFile="${certName}.key"
+    certFile="$OUTPUT_DIR/${certName}.crt"
+    keyFile="$OUTPUT_DIR/${certName}.key"
 
     regenerate=0
 

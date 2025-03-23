@@ -1,4 +1,4 @@
-# Cert Manager
+# Cert Generator
 
 [![Version](https://img.shields.io/badge/version-latest-blue)](https://github.com/goldsam/cert-generator/releases)
 [![Docker Image](https://img.shields.io/badge/docker%20image-ghcr.io/goldsam/cert--generator:latest-green)](https://ghcr.io/goldsam/cert-generator)

@@ -2,7 +2,7 @@
 set -e
 
 # Check for config file argument
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+if [ "$#" -lt 1 ]; then
     echo "Usage: $0 <config-file.json|config-file.yaml> [output-directory]"
     exit 1
 fi
@@ -21,8 +21,11 @@ fi
 CERT_COUNT=$(yq e '.certificates | length' "$CONFIG_FILE")
 if [ "$CERT_COUNT" -eq 0 ]; then
     echo "No certificates found in the configuration."
-    exit 0
+    exit 2
 fi
+
+# Track failures
+failures=0
 
 # Process each certificate record.
 for i in $(seq 0 $(($CERT_COUNT - 1))); do
@@ -127,10 +130,18 @@ EOF
             openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile" \
               -extensions v3_req -config "$extFile"
+            if [ $? -ne 0 ]; then
+                echo "Failed to generate certificate for $certName!"
+                failures=1
+            fi
             rm "$extFile"
         else
             openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile"
+            if [ $? -ne 0 ]; then
+                echo "Failed to generate certificate for $certName!"
+                failures=1
+            fi
         fi
     else
         echo "Certificate $certName is up-to-date."
@@ -138,3 +149,8 @@ EOF
 
 
 done
+
+# Print success message only if there were no failures
+if [ $failures -eq 0 ]; then
+    echo "Certificates were successfully updated."
+fi

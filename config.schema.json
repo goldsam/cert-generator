@@ -1,88 +1,114 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "SSLCertificates",
-    "description": "A document representing a list of SSL certificates to generate.",
-    "type": "object",
-    "properties": {
-      "certificates": {
-        "type": "array",
-        "description": "List of SSL certificates to generate.",
-        "items": {
-          "type": "object",
-          "properties": {
-            "certName": {
-              "type": "string",
-              "description": "A unique name for the certificate."
-            },
-            "subject": {
-              "type": "object",
-              "description": "Distinguished Name (DN) fields for the certificate subject.",
-              "properties": {
-                "C": {
-                  "type": "string",
-                  "description": "Country Name (2-letter code).",
-                  "minLength": 2,
-                  "maxLength": 2
-                },
-                "ST": {
-                  "type": "string",
-                  "description": "State or Province Name."
-                },
-                "L": {
-                  "type": "string",
-                  "description": "Locality (e.g., city)."
-                },
-                "O": {
-                  "type": "string",
-                  "description": "Organization Name."
-                },
-                "OU": {
-                  "type": "string",
-                  "description": "Organizational Unit Name."
-                },
-                "CN": {
-                  "type": "string",
-                  "description": "Common Name (e.g., domain name)."
-                },
-                "emailAddress": {
-                  "type": "string",
-                  "format": "email",
-                  "description": "Contact email address."
-                }
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SSLCertificates",
+  "description": "A document representing a list of SSL certificates to generate.",
+  "type": "object",
+  "properties": {
+    "certificates": {
+      "type": "array",
+      "description": "List of SSL certificates to generate.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A unique name for the certificate."
+          },
+          "pfx": {
+            "type": "object",
+            "desription": "PFX file generation options.",
+            "properties": {
+              "generate": {
+                "type": "boolean",
+                "description": "Generate a PFX file.",
+                "default": true
               },
-              "required": ["C", "ST", "L", "O", "CN"],
-              "additionalProperties": false
-            },
-            "san": {
-              "type": "array",
-              "description": "List of Subject Alternative Names (SANs) for the certificate.",
-              "items": {
-                "type": "string"
-              },
-              "default": []
-            },
-            "keySize": {
-              "type": "integer",
-              "description": "Key size in bits.",
-              "default": 2048
-            },
-            "digestAlgorithm": {
-              "type": "string",
-              "description": "Digest algorithm used for signing (e.g., SHA256).",
-              "default": "SHA256"
-            },
-            "validityDays": {
-              "type": "integer",
-              "description": "Number of days the certificate is valid for.",
-              "default": 30
+              "password": {
+                "type": "string",
+                "description": "Password for the PFX file.",
+                "default": ""
+              }
             }
           },
-          "required": ["certName", "subject"],
-          "additionalProperties": false
-        }
+          "subject": {
+            "type": "object",
+            "description": "Distinguished Name (DN) fields for the certificate subject.",
+            "properties": {
+              "C": {
+                "type": "string",
+                "description": "Country Name (2-letter code).",
+                "minLength": 2,
+                "maxLength": 2
+              },
+              "ST": {
+                "type": "string",
+                "description": "State or Province Name."
+              },
+              "L": {
+                "type": "string",
+                "description": "Locality (e.g., city)."
+              },
+              "O": {
+                "type": "string",
+                "description": "Organization Name."
+              },
+              "OU": {
+                "type": "string",
+                "description": "Organizational Unit Name."
+              },
+              "CN": {
+                "type": "string",
+                "description": "Common Name (e.g., domain name)."
+              },
+              "emailAddress": {
+                "type": "string",
+                "format": "email",
+                "description": "Contact email address."
+              }
+            },
+            "required": [
+              "C",
+              "ST",
+              "L",
+              "O",
+              "CN"
+            ],
+            "additionalProperties": false
+          },
+          "san": {
+            "type": "array",
+            "description": "List of Subject Alternative Names (SANs) for the certificate.",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "keySize": {
+            "type": "integer",
+            "description": "Key size in bits.",
+            "default": 2048
+          },
+          "digestAlgorithm": {
+            "type": "string",
+            "description": "Digest algorithm used for signing (e.g., SHA256).",
+            "default": "SHA256"
+          },
+          "validityDays": {
+            "type": "integer",
+            "description": "Number of days the certificate is valid for.",
+            "default": 30
+          }
+        },
+        "required": [
+          "name",
+          "subject"
+        ],
+        "additionalProperties": false
       }
-    },
-    "required": ["certificates"],
-    "additionalProperties": false
-  }
-  
+    }
+  },
+  "required": [
+    "certificates"
+  ],
+  "additionalProperties": false
+}

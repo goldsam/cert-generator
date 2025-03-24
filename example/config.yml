@@ -1,5 +1,5 @@
 certificates:
-  - certName: "example-cert"
+  - name: "example-cert"
     subject:
       C: "US"
       ST: "California"
@@ -15,7 +15,7 @@ certificates:
     digestAlgorithm: "SHA256"
     validityDays: 90
 
-  - certName: "test-cert"
+  - name: "test-cert"
     subject:
       C: "US"
       ST: "New York"
@@ -24,6 +24,9 @@ certificates:
       CN: "test.com"
     san:
       - "www.test.com"
+    pfx:
+      generate: true
+      password: "test123"
     keySize: 4096
     digestAlgorithm: "SHA256"
     validityDays: 30

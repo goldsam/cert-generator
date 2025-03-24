@@ -30,7 +30,7 @@ failures=0
 # Process each certificate record.
 for i in $(seq 0 $(($CERT_COUNT - 1))); do
     # Read certificate properties from the configuration.
-    certName=$(yq e ".certificates[$i].certName" "$CONFIG_FILE")
+    certName=$(yq e ".certificates[$i].name" "$CONFIG_FILE")
     subjectC=$(yq e ".certificates[$i].subject.C" "$CONFIG_FILE")
     subjectST=$(yq e ".certificates[$i].subject.ST" "$CONFIG_FILE")
     subjectL=$(yq e ".certificates[$i].subject.L" "$CONFIG_FILE")
@@ -41,6 +41,20 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
     keySize=$(yq e ".certificates[$i].keySize" "$CONFIG_FILE")
     digestAlgorithm=$(yq e ".certificates[$i].digestAlgorithm" "$CONFIG_FILE")
     validityDays=$(yq e ".certificates[$i].validityDays" "$CONFIG_FILE")
+    
+    # Check if pfx object exists first
+    pfxExists=$(yq e ".certificates[$i].pfx" "$CONFIG_FILE" 2>/dev/null | grep -v "^null$" | wc -l)
+    if [ "$pfxExists" -gt 0 ]; then
+        # pfx object exists, so default to true unless specifically false
+        pfxGenerate=$(yq e ".certificates[$i].pfx.generate" "$CONFIG_FILE" 2>/dev/null || echo "true")
+        pfxPassword=$(yq e ".certificates[$i].pfx.password" "$CONFIG_FILE" 2>/dev/null || echo "")
+        if [ "$pfxGenerate" = "null" ]; then
+            pfxGenerate="true"
+        fi
+    else
+        # pfx object doesn't exist, default to false
+        pfxGenerate="false"
+    fi
     
     # Convert digest algorithm to lowercase and prefix with a dash.
     digestOption="-$(echo "$digestAlgorithm" | tr '[:upper:]' '[:lower:]')"
@@ -125,13 +139,13 @@ EOF
 
     # Regenerate the certificate if needed.
     if [ $regenerate -eq 1 ]; then
-        echo "Generating certificate for $certName..."
+        echo "Generating key and certificate for $certName..."
         if [ $SAN_PRESENT -eq 1 ]; then
             openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile" \
               -extensions v3_req -config "$extFile"
             if [ $? -ne 0 ]; then
-                echo "Failed to generate certificate for $certName!"
+                echo "Failed to generate key and certificate files for $certName!"
                 failures=1
             fi
             rm "$extFile"
@@ -139,18 +153,56 @@ EOF
             openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
               -subj "$subjectStr" -keyout "$keyFile" -out "$certFile"
             if [ $? -ne 0 ]; then
-                echo "Failed to generate certificate for $certName!"
+                echo "Failed to generate key and certificate files for $certName!"
                 failures=1
             fi
         fi
     else
-        echo "Certificate $certName is up-to-date."
+        echo "Certificate and key files for $certName are up-to-date."
     fi
 
+    # Generate PFX file if requested
+    if [ "$pfxGenerate" = "true" ]; then
+        pfxFile="$OUTPUT_DIR/${certName}.pfx"
+        pfxRegenerate=$regenerate
+        
+        # First check if the PFX file doesn't exist
+        if [ ! -f "$pfxFile" ]; then
+        
+            echo "PFX file does not exist, will generate."
+            pfxRegenerate=1
+        # Then check if password can decrypt existing file
+        elif [ -n "$pfxPassword" ]; then
+            # Test if the provided password can decrypt the existing PFX
+            if ! openssl pkcs12 -in "$pfxFile" -passin "pass:$pfxPassword" -noout 2>/dev/null; then
+                echo "Cannot decrypt existing PFX with provided password, will regenerate."
+                pfxRegenerate=1
+            fi
+        fi
+        
+        if [ $pfxRegenerate -eq 1 ]; then
+            # Create the PFX file
+            if [ -z "$pfxPassword" ]; then
+                echo "Generating unprotected PFX file for $certName..."
+                openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -nodes
+            else
+                echo "Generating password protected PFX file for $certName..."
+                openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -passout "pass:$pfxPassword"
+            fi
+            if [ $? -ne 0 ]; then
+                echo "Failed to generate PFX file for $certName!"
+                failures=1
+            else
+                echo "PFX file generated successfully."
+            fi
+        else
+            echo "PFX file for $certName is up-to-date."
+        fi
+    fi
 
 done
 
 # Print success message only if there were no failures
 if [ $failures -eq 0 ]; then
-    echo "Certificates were successfully updated."
+    echo "All files are now up-to-date."
 fi

@@ -19,12 +19,11 @@ echo "Validating configuration file $CONFIG_FILE..."
 /usr/local/bin/jsonschema "/config.schema.json" -i "$CONFIG_JSON"
 CONFIG_VALID=$?
 rm -f "$CONFIG_JSON"
-if [ CONFIG_VALID != "0" ]; then
+if [ $CONFIG_VALID != "0" ]; then
     echo "Configuration file validation failed!"
     exit 1
 fi
 
-echo "CONFIG_VALID:$CONFIG_VALID"
 # Create output directory if it doesn't exist
 if [ ! -d "$OUTPUT_DIR" ]; then
     echo "Creating output directory: $OUTPUT_DIR"

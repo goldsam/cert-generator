@@ -27,7 +27,7 @@ The image uses a configuration file (JSON or YAML) format specified by the [`./c
 
 ### Example
 
-An example configuration is provided in  [`./examples/config.yml`](./examples/config.yml).
+An example configuration is provided in  [`./example/config.yml`](./example/config.yml).
 
 ## Building
 

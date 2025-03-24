@@ -10,12 +10,26 @@ fi
 CONFIG_FILE="$1"
 OUTPUT_DIR="${2:-.}"  # Default to current directory if not specified
 
+# Convert the config file to JSON
+CONFIG_JSON=$(mktemp)
+yq eval -o=json "." "$CONFIG_FILE" > "$CONFIG_JSON"
+
+# Validate the configuration file against the schema
+echo "Validating configuration file $CONFIG_FILE..."
+/usr/local/bin/jsonschema "/config.schema.json" -i "$CONFIG_JSON"
+CONFIG_VALID=$?
+rm -f "$CONFIG_JSON"
+if [ CONFIG_VALID != "0" ]; then
+    echo "Configuration file validation failed!"
+    exit 1
+fi
+
+echo "CONFIG_VALID:$CONFIG_VALID"
 # Create output directory if it doesn't exist
 if [ ! -d "$OUTPUT_DIR" ]; then
     echo "Creating output directory: $OUTPUT_DIR"
     mkdir -p "$OUTPUT_DIR"
 fi
-
 
 # Get the number of certificates in the config.
 CERT_COUNT=$(yq e '.certificates | length' "$CONFIG_FILE")

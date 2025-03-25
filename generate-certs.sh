@@ -92,7 +92,15 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
         cat > "$extFile" <<EOF
 [ req ]
 distinguished_name = req_distinguished_name
+req_extensions = v3_req
+x509_extensions = v3_req
 [ req_distinguished_name ]
+C = ${subjectC}
+ST = ${subjectST}
+L = ${subjectL}
+O = ${subjectO}
+OU = ${subjectOU}
+CN = ${subjectCN}
 [ v3_req ]
 subjectAltName = @alt_names
 [ alt_names ]
@@ -153,23 +161,23 @@ EOF
     # Regenerate the certificate if needed.
     if [ $regenerate -eq 1 ]; then
         echo "Generating key and certificate for $certName..."
-        if [ $SAN_PRESENT -eq 1 ]; then
-            openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
-              -subj "$subjectStr" -keyout "$keyFile" -out "$certFile" \
-              -extensions v3_req -config "$extFile"
-            if [ $? -ne 0 ]; then
-                echo "Failed to generate key and certificate files for $certName!"
-                failures=1
-            fi
-            rm "$extFile"
-        else
-            openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
-              -subj "$subjectStr" -keyout "$keyFile" -out "$certFile"
-            if [ $? -ne 0 ]; then
-                echo "Failed to generate key and certificate files for $certName!"
-                failures=1
-            fi
+        # if [ $SAN_PRESENT -eq 1 ]; then
+        openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
+            -subj "$subjectStr" -keyout "$keyFile" -out "$certFile" \
+            -extensions v3_req -config "$extFile"
+        if [ $? -ne 0 ]; then
+            echo "Failed to generate key and certificate files for $certName!"
+            failures=1
         fi
+        rm "$extFile"
+        # else
+        #     openssl req $digestOption -new -newkey rsa:${keySize} -nodes -x509 -days ${validityDays} \
+        #       -subj "$subjectStr" -keyout "$keyFile" -out "$certFile"
+        #     if [ $? -ne 0 ]; then
+        #         echo "Failed to generate key and certificate files for $certName!"
+        #         failures=1
+        #     fi
+        # fi
     else
         echo "Certificate and key files for $certName are up-to-date."
     fi

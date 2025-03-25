@@ -14,22 +14,6 @@
             "type": "string",
             "description": "A unique name for the certificate."
           },
-          "pfx": {
-            "type": "object",
-            "desription": "PFX file generation options.",
-            "properties": {
-              "generate": {
-                "type": "boolean",
-                "description": "Generate a PFX file.",
-                "default": true
-              },
-              "password": {
-                "type": "string",
-                "description": "Password for the PFX file.",
-                "default": ""
-              }
-            }
-          },
           "subject": {
             "type": "object",
             "description": "Distinguished Name (DN) fields for the certificate subject.",
@@ -66,13 +50,6 @@
                 "description": "Contact email address."
               }
             },
-            "required": [
-              "C",
-              "ST",
-              "L",
-              "O",
-              "CN"
-            ],
             "additionalProperties": false
           },
           "san": {
@@ -100,8 +77,7 @@
           }
         },
         "required": [
-          "name",
-          "subject"
+          "name"
         ],
         "additionalProperties": false
       }

@@ -1,4 +1,6 @@
 certificates:
+  - name: default-cert
+
   - name: "example-cert"
     subject:
       C: "US"
@@ -24,9 +26,6 @@ certificates:
       CN: "test.com"
     san:
       - "www.test.com"
-    pfx:
-      generate: true
-      password: "test123"
     keySize: 4096
     digestAlgorithm: "SHA256"
     validityDays: 30

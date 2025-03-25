@@ -51,6 +51,7 @@ DEFAULT_CN=${DEFAULT_CN:-"example.com"}
 DEFAULT_emailAddress=${DEFAULT_emailAddress:-"admin@example.com"}
 DEFAULT_validityDays=${DEFAULT_validityDays:-"365"}
 DEFAULT_keySize=${DEFAULT_keySize:-"2048"}
+DEFAULT_extendedKeyUsage=${DEFAULT_extendedKeyUsage:-"[\"serverAuth\"]"}
 
 # Process each certificate record.
 for i in $(seq 0 $(($CERT_COUNT - 1))); do
@@ -67,6 +68,7 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
     keySize=$(yq e ".certificates[$i].keySize // \"$DEFAULT_keySize\"" "$CONFIG_FILE")
     digestAlgorithm=$(yq e ".certificates[$i].digestAlgorithm // \"$DEFAULT_digestAlgorithm\"" "$CONFIG_FILE")
     validityDays=$(yq e ".certificates[$i].validityDays // \"$DEFAULT_validityDays\"" "$CONFIG_FILE")
+    extendedKeyUsage=$(yq e ".certificates[$i].extendedKeyUsage // $DEFAULT_extendedKeyUsage" "$CONFIG_FILE" | yq e '. | join(", ")')
     
     # Convert digest algorithm to lowercase and prefix with a dash.
     digestOption="-$(echo "$digestAlgorithm" | tr '[:upper:]' '[:lower:]')"
@@ -82,8 +84,9 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
     fi
 
     # Create a temporary OpenSSL extension configuration file for SAN.
-    extFile=$(mktemp)
-        
+    #extFile=$(mktemp)
+    extFile="$OUTPUT_DIR/${certName}.ext"
+
     cat <<EOF > "$extFile"
 [ req ]
 default_bits       = ${keySize} 
@@ -101,36 +104,23 @@ OU                 = ${subjectOU}
 CN                 = ${subjectCN}
 emailAddress       = ${emailAddress}
 
-EOF
-        
-    # Process the SAN list if it exists.
-    sanCount=$(yq e ".certificates[$i].san | length" "$CONFIG_FILE" 2>/dev/null || echo 0)
-    SAN_PRESENT=0
-    if [ "$sanCount" -gt 0 ]; then
-        SAN_PRESENT=1
-        
-        cat <<EOF >> "$extFile"
 [ req_ext ]
 subjectAltName = @alt_names
 
 [ v3_req ]
 subjectAltName = @alt_names
-
+extendedKeyUsage = ${extendedKeyUsage}
 [ alt_names ]
 EOF
-
+    sanCount=$(yq e ".certificates[$i].san | length" "$CONFIG_FILE" 2>/dev/null || echo 0)
+    if [ $sanCount -gt 0 ]; then
+        
         for j in $(seq 0 $(($sanCount - 1))); do
             sanEntry=$(yq e ".certificates[$i].san[$j]" "$CONFIG_FILE")
             echo "DNS.$((j+1)) = $sanEntry" >> "$extFile"
         done
-
     else
-        cat <<EOF >> "$extFile"
-[ req_ext ]
-
-[ v3_req ]
-EOF
-
+        echo "DNS.1 = ${subjectCN}" >> "$extFile"
     fi
 
     # Define file names for the key, CSR, and certs.
@@ -151,8 +141,8 @@ EOF
         fi
 
         # Check SAN entries if provided.
-        if [ $SAN_PRESENT -eq 1 ]; then
-            currentSAN=$(openssl x509 -in "$certFile" -noout -ext subjectAltName | sed 's/subjectAltName=//')
+        currentSAN=$(openssl x509 -in "$certFile" -noout -ext subjectAltName | sed 's/subjectAltName=//')
+        if [ $sanCount -gt 0 ]; then
             for j in $(seq 0 $(($sanCount - 1))); do
                 sanEntry=$(yq e ".certificates[$i].san[$j]" "$CONFIG_FILE")
                 if ! echo "$currentSAN" | grep -q "$sanEntry"; then
@@ -161,7 +151,13 @@ EOF
                     break
                 fi
             done
-        fi
+        else
+            # If no SANs are provided, check if the CN is in the SAN.
+            if ! echo "$currentSAN" | grep -q "DNS:${subjectCN}"; then
+                echo "SAN entry for CN '${subjectCN}' missing in $certName."
+                regenerate=1
+            fi
+        fi    
 
         # Check key size.
         # Extract the key size from the certificate's text. This assumes a line like "Public-Key: (2048 bit)".

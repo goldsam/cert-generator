@@ -1,6 +1,18 @@
 certificates:
   - name: default-cert
 
+  - name: 'ext-key-usage'
+    extendedKeyUsage:
+      - "serverAuth"
+      - "clientAuth"
+      - "codeSigning"
+      - "timeStamping"
+    
+  - name: 'alt-names'
+    san:
+      - "www.example.com"
+      - "api.example.com"
+
   - name: "example-cert"
     subject:
       C: "US"

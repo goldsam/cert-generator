@@ -55,10 +55,26 @@
           "san": {
             "type": "array",
             "description": "List of Subject Alternative Names (SANs) for the certificate.",
+            "minItems": 1,
             "items": {
               "type": "string"
             },
             "default": []
+          },
+          "extendedKeyUsage": {
+            "type": "array",
+            "description": "Extended Key Usage (EKU) values for the certificate.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "serverAuth",
+                "clientAuth",
+                "codeSigning",
+                "emailProtection",
+                "timeStamping"
+              ]
+            },
+            "default": ["serverAuth"]
           },
           "keySize": {
             "type": "integer",

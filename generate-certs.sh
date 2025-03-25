@@ -82,8 +82,9 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
       subjectStr="${subjectStr}, emailAddress=${emailAddress}"
     fi
 
-    extFile="$OUTPUT_DIR/${certName}.cfg"
-
+    # Create a temporary OpenSSL extension configuration file for SAN.
+    extFile=$(mktemp)
+        
     cat <<EOF > "$extFile"
 [ req ]
 default_bits       = ${keySize} 
@@ -102,15 +103,12 @@ CN                 = ${subjectCN}
 emailAddress       = ${emailAddress}
 
 EOF
-
         
     # Process the SAN list if it exists.
     sanCount=$(yq e ".certificates[$i].san | length" "$CONFIG_FILE" 2>/dev/null || echo 0)
     SAN_PRESENT=0
     if [ "$sanCount" -gt 0 ]; then
         SAN_PRESENT=1
-        # Create a temporary OpenSSL extension configuration file for SAN.
-        # extFile=$(mktemp)
         
         cat <<EOF >> "$extFile"
 [ req_ext ]
@@ -136,10 +134,11 @@ EOF
 
     fi
 
-    # Define file names for the certificate and key.
+    # Define file names for the key, CSR, and certs.
     keyFile="$OUTPUT_DIR/${certName}.key"
     csrFile="$OUTPUT_DIR/${certName}.csr"
     certFile="$OUTPUT_DIR/${certName}.crt"
+    pfxFile="$OUTPUT_DIR/${certName}.pfx"
     
     regenerate=0
 
@@ -208,42 +207,26 @@ EOF
     fi
 
     # Generate PFX file if requested
-    if [ "$pfxGenerate" = "true" ]; then
-        pfxFile="$OUTPUT_DIR/${certName}.pfx"
-        pfxRegenerate=$regenerate
-        
-        # First check if the PFX file doesn't exist
-        if [ ! -f "$pfxFile" ]; then
-        
-            echo "PFX file does not exist, will generate."
-            pfxRegenerate=1
-        # Then check if password can decrypt existing file
-        elif [ -n "$pfxPassword" ]; then
-            # Test if the provided password can decrypt the existing PFX
-            if ! openssl pkcs12 -in "$pfxFile" -passin "pass:$pfxPassword" -noout 2>/dev/null; then
-                echo "Cannot decrypt existing PFX with provided password, will regenerate."
-                pfxRegenerate=1
-            fi
-        fi
-        
-        if [ $pfxRegenerate -eq 1 ]; then
-            # Create the PFX file
-            if [ -z "$pfxPassword" ]; then
-                echo "Generating unprotected PFX file for $certName..."
-                openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -nodes
-            else
-                echo "Generating password-protected PFX file for $certName..."
-                openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -passout "pass:$pfxPassword"
-            fi
-            if [ $? -ne 0 ]; then
-                echo "Failed to generate PFX file for $certName!"
-                failures=1
-            else
-                echo "PFX file generated successfully."
-            fi
+    pfxRegenerate=$regenerate
+    
+    # First check if the PFX file doesn't exist
+    if [ ! -f "$pfxFile" ]; then
+        echo "PFX file does not exist, will generate."
+        pfxRegenerate=1
+    fi
+
+    if [ $pfxRegenerate -eq 1 ]; then
+        # Create the PFX file
+        echo "Generating unprotected PFX file for $certName..."
+        openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -passout pass:
+        if [ $? -ne 0 ]; then
+            echo "Failed to generate PFX file for $certName!"
+            failures=1
         else
-            echo "PFX file for $certName is up-to-date."
+            echo "PFX file generated successfully."
         fi
+    else
+        echo "PFX file for $certName is up-to-date."
     fi
 
 done

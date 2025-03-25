@@ -68,7 +68,6 @@ for i in $(seq 0 $(($CERT_COUNT - 1))); do
     digestAlgorithm=$(yq e ".certificates[$i].digestAlgorithm // \"$DEFAULT_digestAlgorithm\"" "$CONFIG_FILE")
     validityDays=$(yq e ".certificates[$i].validityDays // \"$DEFAULT_validityDays\"" "$CONFIG_FILE")
     
-    echo "keySize=$keySize"
     # Convert digest algorithm to lowercase and prefix with a dash.
     digestOption="-$(echo "$digestAlgorithm" | tr '[:upper:]' '[:lower:]')"
 
@@ -188,19 +187,15 @@ EOF
         # Create private key + CSR:
         echo "Generating key and CSR for $certName..."
         openssl req $digestOption -newkey rsa:${keySize} -nodes \
-            -keyout "$keyFile" -out "$csrFile" -config "$extFile"
+            -keyout "$keyFile" -out "$csrFile" -config "$extFile" \
+        && openssl x509 $digestOption -req -days ${validityDays} -in "$csrFile" \
+            -signkey "$keyFile" -extensions v3_req -extfile "$extFile" -out "$certFile" \
+        && chmod 644 "$certFile" "$keyFile" "$csrFile"
+        
         if [ $? -ne 0 ]; then
-            echo "Failed to generate key and CSR for $certName!"
+            echo "Failed to generate self-signed certificate for $certName!"
             failures=1
-        else
-            echo "Generating self-signed certificate for $certName..."                  
-            openssl x509 $digestOption -req -days ${validityDays} -in "$csrFile" \
-                -signkey "$keyFile" -extensions v3_req -extfile "$extFile" -out "$certFile"
-            if [ $? -ne 0 ]; then
-                echo "Failed to generate self-signed certificate for $certName!"
-                failures=1
-            fi
-        fi 
+        fi
     # rm -f "$extFile"
     else
         echo "Certificate and key files for $certName are up-to-date."
@@ -218,7 +213,9 @@ EOF
     if [ $pfxRegenerate -eq 1 ]; then
         # Create the PFX file
         echo "Generating unprotected PFX file for $certName..."
-        openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -passout pass:
+        openssl pkcs12 -export -out "$pfxFile" -inkey "$keyFile" -in "$certFile" -passout pass: \
+        && chmod 644 "$pfxFile"
+        
         if [ $? -ne 0 ]; then
             echo "Failed to generate PFX file for $certName!"
             failures=1

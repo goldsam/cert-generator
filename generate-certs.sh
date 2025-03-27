@@ -104,6 +104,8 @@ for i in $(seq 0 $((cert_count - 1))); do
     if [ $? -ne 0 ]; then
         echo "Failed to generate self-signed certificate for $name!"
         failures=1
+    else
+        chmod 644 "${name}.key"
     fi
 
 done

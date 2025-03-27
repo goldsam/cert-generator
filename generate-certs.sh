@@ -36,7 +36,7 @@ ca_root=$(mkcert -CAROOT)
 ca_cert_pem="${ca_root}/rootCA.pem"
 
 # If the CA certificate is not found, run mkcert -install to create it.
-if [ ! -f "$ca_cert" ]; then
+if [ ! -f "ca_cert_pem" ]; then
     echo "CA certificate not found in ${ca_root}. Running 'mkcert -install' to generate it."
     mkcert -install
 fi
@@ -100,11 +100,11 @@ for i in $(seq 0 $((cert_count - 1))); do
     cmd="$cmd $all_hosts"
     
     echo "Running: $cmd"
-    eval "$cmd"
-    if [ $? -ne 0 ]; then
+    
+    if ! eval "$cmd"; then
         echo "Failed to generate self-signed certificate for $name!"
         failures=1
-    else
+    elif [ "$pfx" != "true" ]; then
         chmod 644 "${name}.key"
     fi
 
@@ -115,5 +115,9 @@ if [ $failures -ne 0 ]; then
     echo "Unable to update all certifictes."
     exit 2
 fi
+
+echo "Updating CA certificates bundle..."
+update-ca-certificates
+cp /etc/ssl/certs/ca-certificates.crt ./ca-certificates.crt
 
 echo "All files are now up-to-date."

@@ -9,7 +9,7 @@ RUN cargo install jsonschema-cli
 FROM alpine:3.21
 WORKDIR /certs
 
-RUN apk add --no-cache bash yq
+RUN apk add --no-cache bash yq ca-certificates
 
 COPY --from=builder /usr/local/cargo/bin/jsonschema-cli /usr/local/bin/jsonschema
 COPY --from=builder /usr/local/bin/mkcert /usr/local/bin/mkcert

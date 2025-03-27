@@ -1,43 +1,17 @@
-certificates:
-  - name: default-cert
-
-  - name: 'ext-key-usage'
-    extendedKeyUsage:
-      - "serverAuth"
-      - "clientAuth"
-      - "codeSigning"
-      - "timeStamping"
+additional-hosts:
+  - localhost
+  - 127.0.0.1
+  - ::1
+certs:
+  - name: service1
+  - name: my-client
+    client: true
+  - name: service2
+    hosts: 
+      - example.com
+  - name: service3
+    hosts: 
+      - www.example.com
+      - another.example.com
+    pfx: true
     
-  - name: 'alt-names'
-    san:
-      - "www.example.com"
-      - "api.example.com"
-
-  - name: "example-cert"
-    subject:
-      C: "US"
-      ST: "California"
-      L: "San Francisco"
-      O: "Example Organization"
-      OU: "IT Department"
-      CN: "example.com"
-      emailAddress: "admin@example.com"
-    san:
-      - "www.example.com"
-      - "api.example.com"
-    keySize: 2048
-    digestAlgorithm: "SHA256"
-    validityDays: 90
-
-  - name: "test-cert"
-    subject:
-      C: "US"
-      ST: "New York"
-      L: "New York City"
-      O: "Test Org"
-      CN: "test.com"
-    san:
-      - "www.test.com"
-    keySize: 4096
-    digestAlgorithm: "SHA256"
-    validityDays: 30

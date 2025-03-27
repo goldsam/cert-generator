@@ -1,106 +1,54 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "SSLCertificates",
-  "description": "A document representing a list of SSL certificates to generate.",
+  "title": "mkcert Certificates Configuration",
+  "description": "Configuration file for generating certificates using mkcert. Contains a list of certificate configurations under 'certs' and an optional 'additional-hosts' array.",
   "type": "object",
   "properties": {
-    "certificates": {
-      "type": "array",
-      "description": "List of SSL certificates to generate.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "A unique name for the certificate."
-          },
-          "subject": {
-            "type": "object",
-            "description": "Distinguished Name (DN) fields for the certificate subject.",
-            "properties": {
-              "C": {
-                "type": "string",
-                "description": "Country Name (2-letter code).",
-                "minLength": 2,
-                "maxLength": 2
+      "certs": {
+          "type": "array",
+          "description": "An array of certificate configurations. For each certificate, mkcert will generate a PEM certificate, private key, PKCS#12 file, and a DER certificate.",
+          "items": {
+              "type": "object",
+              "properties": {
+                  "name": {
+                      "type": "string",
+                      "description": "The base name for the certificate files."
+                  },
+                  "pfx": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Set to true to generate a PKCS#12 file; defaults to false if omitted."
+                  },
+                  "client": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Set to true for a client certificate; defaults to false (server certificate) if omitted."
+                  },
+                  "hosts": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                          "type": "string"
+                      },
+                      "description": "A list of host names for which to generate the certificate. Must have at least one element."
+                  }
               },
-              "ST": {
-                "type": "string",
-                "description": "State or Province Name."
-              },
-              "L": {
-                "type": "string",
-                "description": "Locality (e.g., city)."
-              },
-              "O": {
-                "type": "string",
-                "description": "Organization Name."
-              },
-              "OU": {
-                "type": "string",
-                "description": "Organizational Unit Name."
-              },
-              "CN": {
-                "type": "string",
-                "description": "Common Name (e.g., domain name)."
-              },
-              "emailAddress": {
-                "type": "string",
-                "format": "email",
-                "description": "Contact email address."
-              }
-            },
-            "additionalProperties": false
-          },
-          "san": {
-            "type": "array",
-            "description": "List of Subject Alternative Names (SANs) for the certificate.",
-            "minItems": 1,
-            "items": {
-              "type": "string"
-            },
-            "default": []
-          },
-          "extendedKeyUsage": {
-            "type": "array",
-            "description": "Extended Key Usage (EKU) values for the certificate.",
-            "items": {
-              "type": "string",
-              "enum": [
-                "serverAuth",
-                "clientAuth",
-                "codeSigning",
-                "emailProtection",
-                "timeStamping"
-              ]
-            },
-            "default": ["serverAuth"]
-          },
-          "keySize": {
-            "type": "integer",
-            "description": "Key size in bits.",
-            "default": 2048
-          },
-          "digestAlgorithm": {
-            "type": "string",
-            "description": "Digest algorithm used for signing (e.g., SHA256).",
-            "default": "SHA256"
-          },
-          "validityDays": {
-            "type": "integer",
-            "description": "Number of days the certificate is valid for.",
-            "default": 30
+              "required": [
+                  "name"
+              ],
+              "additionalProperties": false
           }
-        },
-        "required": [
-          "name"
-        ],
-        "additionalProperties": false
+      },
+      "additional-hosts": {
+          "type": "array",
+          "description": "An optional array of additional host names to be added to every certificate.",
+          "items": {
+              "type": "string"
+          }
       }
-    }
   },
   "required": [
-    "certificates"
+      "certs"
   ],
   "additionalProperties": false
 }

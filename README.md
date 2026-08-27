@@ -56,6 +56,15 @@ docker run --rm -e CAROOT=/certs/my-ca -v $(pwd)/certs:/certs ghcr.io/goldsam/ce
 Note that leaf certificates are re-issued on every run. They remain valid, since
 they are signed by the persisted CA, but their serial numbers and keys change.
 
+### Image tags
+
+| Tag | Points at |
+| --- | --- |
+| `latest` | The tip of the `main` branch, updated on every push to it |
+| `sha-<short>` | One specific commit, e.g. `sha-51a4ec1`; never reused |
+
+Pin to a `sha-` tag when you need a build that will not move underneath you.
+
 ## Configuration
 
 

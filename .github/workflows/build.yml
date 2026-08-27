@@ -45,6 +45,18 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # latest=false disables the action's own handling of `latest`, so the
+          # raw rule below is the only thing that can move it.
+          flavor: |
+            latest=false
+          # Tags produced, in the order listed below:
+          #   latest          moving pointer at the tip of the default branch
+          #   sha-51a4ec1     immutable per-commit reference, every build
+          # Comments are deliberately kept out of the block below: its contents
+          # are passed to the action verbatim, not read as YAML.
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
 
       # Build once, into the local daemon, carrying both the release tags and a
       # fixed local tag for the tests. Nothing is pushed yet: the image has to

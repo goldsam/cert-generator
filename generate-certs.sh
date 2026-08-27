@@ -2,14 +2,14 @@
 
 # Ensure a configuration file is provided.
 if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 config.yaml|config.json"
+    echo "Usage: $0 config.yaml|config.json" >&2
     exit 1
 fi
 
 CONFIG_FILE="$1"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: Configuration file '$CONFIG_FILE' not found."
+    echo "Error: Configuration file '$CONFIG_FILE' not found." >&2
     exit 3
 fi
 
@@ -17,47 +17,77 @@ fi
 CONFIG_JSON=$(mktemp)
 trap 'rm -f "$CONFIG_JSON"' EXIT
 if ! yq eval -o=json "." "$CONFIG_FILE" > "$CONFIG_JSON"; then
-    echo "Error: Configuration file contains malformed JSON or YAML."
+    echo "Error: Configuration file contains malformed JSON or YAML." >&2
     exit 4
 fi
 
 # Validate configuration against the schema.
-validation_output=$(jsonschema -i "$CONFIG_JSON" /config.schema.json 2>&1)
+validation_output=$(jsonschema validate /config.schema.json "$CONFIG_JSON" 2>&1)
 validation_exit_code=$?
 if [ $validation_exit_code -ne 0 ]; then
-    echo "Error: Configuration file is invalid:"
+    echo "Error: Configuration file is invalid:" >&2
     # strip the first line of the output which contains the meaningless temp file name.
-    echo "$validation_output" | tail -n +2
+    echo "$validation_output" | tail -n +2 >&2
     exit 5
 fi
 
-# Determine mkcert CA directory.
+# Determine the mkcert CA directory.
+#
+# Left to itself, mkcert puts CAROOT under $HOME, which lives in the
+# container's ephemeral filesystem. Only the working directory is bind-mounted,
+# so the CA key material would be discarded when the container exits and every
+# run would mint a brand-new root CA -- silently invalidating every previously
+# issued certificate. Anchor CAROOT inside the working directory instead so the
+# CA survives across runs. An explicit CAROOT in the environment still wins.
+CAROOT="${CAROOT:-$(pwd)/ca}"
+export CAROOT
+mkdir -p "$CAROOT"
+
 ca_root=$(mkcert -CAROOT)
 ca_cert_pem="${ca_root}/rootCA.pem"
+ca_key_pem="${ca_root}/rootCA-key.pem"
 
-# If the CA certificate is not found, run mkcert -install to create it.
-if [ ! -f "ca_cert_pem" ]; then
-    echo "CA certificate not found in ${ca_root}. Running 'mkcert -install' to generate it."
-    mkcert -install
+if [ -f "$ca_cert_pem" ] && [ -f "$ca_key_pem" ]; then
+    echo "Reusing existing CA in ${ca_root}."
+elif [ -f "$ca_cert_pem" ]; then
+    echo "Error: ${ca_cert_pem} exists but ${ca_key_pem} is missing; the CA cannot sign." >&2
+    exit 6
+else
+    echo "No CA found in ${ca_root}. A new one will be generated."
 fi
 
-# Verify again that the CA certificate now exists.
+# mkcert -install only creates a CA when CAROOT has none, so this is a no-op
+# for the key material on subsequent runs. It still has to run every time to
+# add the CA to *this* container's trust store, which is what the
+# update-ca-certificates bundle below exports.
+if ! mkcert -install; then
+    echo "Error: 'mkcert -install' failed." >&2
+    exit 6
+fi
+
+# Verify the CA certificate now exists.
 if [ -f "$ca_cert_pem" ]; then
   cp "$ca_cert_pem" ./rootCA.crt
   echo "CA certificate copied to ./rootCA.crt"
 else
-  echo "Error: CA certificate still not found in ${ca_root} after mkcert -install"
+  echo "Error: CA certificate still not found in ${ca_root} after mkcert -install" >&2
   exit 6
 fi
 
 # Extract additional hosts (if any) as a space-separated list.
-additional_hosts=$(yq e '.["additional-hosts"] // [] | join(" ")' "$CONFIG_FILE")
+#
+# Every extraction below forces -o=yaml. yq's default output format is "auto",
+# which mirrors the input format, so reading a JSON config would yield
+# JSON-quoted scalars: a name would come back as "svc" (quotes included) and a
+# joined host list as a single quoted string. Both are documented as supported
+# input formats, so pin the output format instead of letting it vary.
+additional_hosts=$(yq e -o=yaml '.["additional-hosts"] // [] | join(" ")' "$CONFIG_FILE")
 
 # Get the number of certificate configurations.
-cert_count=$(yq e '.certs | length' "$CONFIG_FILE")
+cert_count=$(yq e -o=yaml '.certs | length' "$CONFIG_FILE")
 
 if [ "$cert_count" -eq 0 ]; then
-    echo "No certificates defined in configuration."
+    echo "No certificates defined in configuration." >&2
     exit 7
 fi
 
@@ -66,12 +96,12 @@ failures=0
 
 # Process each certificate configuration.
 for i in $(seq 0 $((cert_count - 1))); do
-    name=$(yq e ".certs[$i].name" "$CONFIG_FILE")
+    name=$(yq e -o=yaml ".certs[$i].name" "$CONFIG_FILE")
     # Default to false if the client property is not provided.
-    client=$(yq e ".certs[$i].client // false" "$CONFIG_FILE")
-    pfx=$(yq e ".certs[$i].pfx // false" "$CONFIG_FILE")
+    client=$(yq e -o=yaml ".certs[$i].client // false" "$CONFIG_FILE")
+    pfx=$(yq e -o=yaml ".certs[$i].pfx // false" "$CONFIG_FILE")
     # Extract the required hosts list and join into a space-separated string.
-    cert_hosts=$(yq e ".certs[$i].hosts // [] | join(\" \")" "$CONFIG_FILE" 2>/dev/null || echo "")
+    cert_hosts=$(yq e -o=yaml ".certs[$i].hosts // [] | join(\" \")" "$CONFIG_FILE" 2>/dev/null || echo "")
 
     # If hosts array is empty or not defined, use the name field as the host.
     if [ -z "$cert_hosts" ];then
@@ -102,7 +132,7 @@ for i in $(seq 0 $((cert_count - 1))); do
     echo "Running: $cmd"
     
     if ! eval "$cmd"; then
-        echo "Failed to generate self-signed certificate for $name!"
+        echo "Failed to generate self-signed certificate for $name!" >&2
         failures=1
     elif [ "$pfx" != "true" ]; then
         chmod 644 "${name}.key"
@@ -112,7 +142,7 @@ done
 
 # Print success message only if there were no failures
 if [ $failures -ne 0 ]; then
-    echo "Unable to update all certifictes."
+    echo "Unable to update all certifictes." >&2
     exit 2
 fi
 
